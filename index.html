@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Lab Data Log (Audit Tracking)</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --success: #16a34a;
+            --danger: #dc2626;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #0f172a;
+            --border: #cbd5e1;
+        }
+        
+        * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+        
+        body { 
+            margin: 0; 
+            padding: 12px; 
+            background: var(--bg); 
+            color: var(--text);
+            font-size: 16px; 
+        }
+
+        .wrapper { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 16px; 
+            max-width: 100%; 
+        }
+
+        .card { 
+            background: var(--card); 
+            padding: 16px; 
+            border-radius: 12px; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
+        }
+
+        h2 { 
+            margin: 0 0 14px 0; 
+            font-size: 1.1rem; 
+            color: #0f172a; 
+            border-bottom: 2px solid #f1f5f9; 
+            padding-bottom: 6px; 
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-grid { display: flex; flex-direction: column; gap: 12px; }
+        .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .field { display: flex; flex-direction: column; gap: 4px; }
+        label { font-weight: 600; font-size: 0.85rem; color: #475569; }
+
+        input, select, textarea { 
+            width: 100%;
+            padding: 10px 12px; 
+            border: 1px solid var(--border); 
+            border-radius: 8px; 
+            font-size: 0.95rem; 
+            background: #fff;
+            -webkit-appearance: none; 
+        }
+        
+        select {
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M0 3l5 5 5-5z' fill='%23666'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 30px;
+        }
+
+        input:focus, select:focus, textarea:focus { 
+            outline: 2px solid var(--primary); 
+            border-color: transparent; 
+        }
+
+        .conditional-box { 
+            background: #f1f5f9; 
+            border-left: 4px solid var(--primary); 
+            padding: 10px; 
+            margin-top: 4px; 
+            border-radius: 0 8px 8px 0; 
+            display: none; 
+        }
+
+        .checkbox-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+        }
+
+        .checkbox-group { display: flex; align-items: center; gap: 10px; }
+        .checkbox-group input[type="checkbox"] { width: 20px; height: 20px; margin: 0; }
+        .checkbox-group label { font-size: 0.95rem; cursor: pointer; }
+
+        .btn { 
+            width: 100%;
+            padding: 12px; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-weight: 600; 
+            font-size: 1rem; 
+            color: white; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            gap: 6px; 
+            margin-top: 8px;
+            touch-action: manipulation;
+        }
+        .btn-primary { background: var(--primary); }
+        .btn-success { background: var(--success); }
+        .btn-danger { background: var(--danger); }
+        
+        .search-box { 
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            margin-bottom: 12px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .log-list { display: flex; flex-direction: column; gap: 12px; }
+        
+        .log-item { 
+            background: #ffffff; 
+            border: 1px solid #e2e8f0; 
+            border-radius: 10px; 
+            padding: 12px; 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+            gap: 8px;
+        }
+
+        .log-title { margin: 0; color: var(--primary); font-size: 1rem; font-weight: 700; word-break: break-word; }
+        
+        .badge { 
+            background: #e0e7ff; 
+            color: #4338ca; 
+            padding: 3px 6px; 
+            border-radius: 4px; 
+            font-weight: 600; 
+            font-size: 0.75rem; 
+            white-space: nowrap;
+        }
+        .tat-badge { background: #fef3c7; color: #92400e; }
+        .auth-badge { background: #e2e8f0; color: #475569; }
+
+        .log-details { 
+            font-size: 0.85rem; 
+            color: #475569; 
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            background: #f8fafc;
+            padding: 8px;
+            border-radius: 6px;
+        }
+        
+        .log-details div { border-bottom: 1px solid #edf2f7; padding-bottom: 3px; }
+        .log-details div:last-child { border: none; }
+
+        .test-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+
+        .item-actions { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 8px; 
+            margin-top: 10px; 
+            border-top: 1px dashed #e2e8f0; 
+            padding-top: 8px; 
+        }
+        .sm-btn { padding: 8px; font-size: 0.85rem; margin: 0; }
+
+        .audit-container {
+            max-height: 180px;
+            overflow-y: auto;
+            background: #1e293b;
+            color: #f8fafc;
+            padding: 10px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.75rem;
+            line-height: 1.4;
+        }
+        .audit-row { border-bottom: 1px solid #334155; padding: 4px 0; }
+        .t-save { color: #4ade80; }
+        .t-edit { color: #60a5fa; }
+        .t-del { color: #f87171; }
+
+        /* GOOGLE SITES COMPATIBLE PIN MODAL OVERLAY */
+        .pin-modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+        .pin-modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .pin-modal-card {
+            background: #ffffff;
+            padding: 24px;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 340px;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        .pin-modal-card h3 { margin: 0 0 8px 0; font-size: 1.1rem; color: #0f172a; }
+        .pin-modal-card p { margin: 0 0 16px 0; font-size: 0.85rem; color: #64748b; }
+        .pin-input {
+            text-align: center; font-size: 1.5rem; letter-spacing: 6px; 
+            padding: 8px; font-weight: bold; border: 2px solid #cbd5e1; margin-bottom: 16px;
+        }
+
+        @media print {
+            body * { visibility: hidden; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; color: #000; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="wrapper">
+        <div class="card">
+            <h2>Patient Entry Form</h2>
+            <form id="labForm" onsubmit="event.preventDefault(); openPinAuthModal('SAVE');">
+                <input type="hidden" id="editId">
+                
+                <div class="form-grid">
+                    <div class="row-2">
+                        <div class="field">
+                            <label>Lab No. / HA</label>
+                            <input type="text" id="labNo" placeholder="HA-101">
+                        </div>
+                        <div class="field">
+                            <label>Date & Time</label>
+                            <input type="datetime-local" id="entryDateTime">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label>Patient Name</label>
+                        <input type="text" id="patientName" placeholder="Patient Name">
+                    </div>
+
+                    <div class="row-2">
+                        <div class="field">
+                            <label>Age</label>
+                            <input type="number" id="age" placeholder="Years">
+                        </div>
+                        <div class="field">
+                            <label>Sex</label>
+                            <select id="sex">
+                                <option value="">Select</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label>Slide Received</label>
+                        <select id="slideRec" onchange="toggleConditional('slideRec', 'slideTimeBox')">
+                            <option value="No">No</option>
+                            <option value="Yes">Yes</option>
+                        </select>
+                        <div id="slideTimeBox" class="conditional-box">
+                            <label>Slide Rec. Date/Time</label>
+                            <input type="datetime-local" id="slideTime">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label>Blood Sample Received</label>
+                        <select id="bloodRec" onchange="toggleConditional('bloodRec', 'bloodTimeBox')">
+                            <option value="No">No</option>
+                            <option value="Yes">Yes</option>
+                        </select>
+                        <div id="bloodTimeBox" class="conditional-box">
+                            <label>Blood Rec. Date/Time</label>
+                            <input type="datetime-local" id="bloodTime">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label>Marrow Sample Received</label>
+                        <select id="marrowRec" onchange="toggleConditional('marrowRec', 'marrowTimeBox')">
+                            <option value="No">No</option>
+                            <option value="Yes">Yes</option>
+                        </select>
+                        <div id="marrowTimeBox" class="conditional-box">
+                            <label>Marrow Rec. Date/Time</label>
+                            <input type="datetime-local" id="marrowTime">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label style="margin-bottom: 4px;">Tests Requested</label>
+                        
+                        <div class="checkbox-card">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="testAsp" onchange="toggleTestBox('testAsp', 'aspBox')">
+                                <label for="testAsp">1. Aspiration</label>
+                            </div>
+                            <div id="aspBox" class="conditional-box">
+                                <div class="row-2">
+                                    <div class="field"><label>Number</label><input type="text" id="aspNum" placeholder="Qty"></div>
+                                    <div class="field"><label>Date/Time</label><input type="datetime-local" id="aspTime"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="checkbox-card">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="testBiopsy" onchange="toggleTestBox('testBiopsy', 'biopsyBox')">
+                                <label for="testBiopsy">2. Trephine Biopsy</label>
+                            </div>
+                            <div id="biopsyBox" class="conditional-box">
+                                <div class="row-2">
+                                    <div class="field"><label>Number</label><input type="text" id="biopsyNum" placeholder="Qty"></div>
+                                    <div class="field"><label>Date/Time</label><input type="datetime-local" id="biopsyTime"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="checkbox-card">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="testOp" onchange="toggleTestBox('testOp', 'opBox')">
+                                <label for="testOp">3. Opinion</label>
+                            </div>
+                            <div id="opBox" class="conditional-box">
+                                <div class="row-2">
+                                    <div class="field"><label>Number</label><input type="text" id="opNum" placeholder="Qty"></div>
+                                    <div class="field"><label>Date/Time</label><input type="datetime-local" id="opTime"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="checkbox-card">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="testIhc" onchange="toggleTestBox('testIhc', 'ihcBox')">
+                                <label for="testIhc">4. IHC</label>
+                            </div>
+                            <div id="ihcBox" class="conditional-box">
+                                <div class="row-2">
+                                    <div class="field"><label>Number</label><input type="text" id="ihcNum" placeholder="Qty"></div>
+                                    <div class="field"><label>Date/Time</label><input type="datetime-local" id="ihcTime"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label>Given To</label>
+                        <select id="givenTo">
+                            <option value="">Select Doctor</option>
+                            <option value="Dr. Banerjee">Dr. Banerjee</option>
+                            <option value="Dr. Das">Dr. Das</option>
+                        </select>
+                        <div id="givenToTimeBox" class="conditional-box">
+                            <label>Handover Date/Time</label>
+                            <input type="datetime-local" id="givenToTime">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label>Other Note</label>
+                        <textarea id="otherNote" rows="2" placeholder="Add custom notes..."></textarea>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" id="submitBtn">Save Entry (Requires PIN)</button>
+                <button type="button" class="btn btn-danger" style="background:#64748b;" onclick="resetForm()">Clear Form</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Activity Audit Tracker Log</h2>
+            <div id="auditLogBox" class="audit-container">
+                <div class="audit-row" style="color:#94a3b8;">No recent database operational events logged.</div>
+            </div>
+        </div>
+
+        <div class="card" style="padding: 12px;">
+            <h2>Records Log Database</h2>
+            <input type="text" id="searchBar" class="search-box" oninput="renderLogs()" placeholder="🔍 Search records dynamically...">
+            <button class="btn btn-success" style="margin-bottom:15px;" onclick="printDatabaseLogs()">🖨️ Print All Records Database</button>
+
+            <div id="logList" class="log-list"></div>
+        </div>
+    </div>
+
+    <div id="securityModal" class="pin-modal-overlay">
+        <div class="pin-modal-card">
+            <h3 id="modalActionTitle">Security Authorization</h3>
+            <p>Enter Security Staff PIN to verify changes:</p>
+            <input type="password" id="modalPinInput" class="pin-input" maxlength="4" placeholder="••••" inputmode="numeric">
+            <div style="display:flex; gap:10px;">
+                <button class="btn btn-danger" style="margin:0; background:#94a3b8;" onclick="closePinAuthModal()">Cancel</button>
+                <button class="btn btn-primary" style="margin:0;" onclick="submitPinAuthForm()">Verify</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="print-area"></div>
+
+    <script>
+        const STAFF_DIRECTORY = {
+            "1234": "Sourav",
+            "2345": "Dipankar",
+            "3456": "Harish",
+            "4567": "Pratik"
+        };
+
+        let currentPendingAction = null;
+        let currentPendingRecordId = null;
+
+        function openPinAuthModal(actionType, recordId = null) {
+            currentPendingAction = actionType;
+            currentPendingRecordId = recordId;
+            document.getElementById('modalActionTitle').innerText = `Authorize [${actionType}]`;
+            document.getElementById('modalPinInput').value = "";
+            document.getElementById('securityModal').classList.add('active');
+            setTimeout(() => document.getElementById('modalPinInput').focus(), 150);
+        }
+
+        function closePinAuthModal() {
+            document.getElementById('securityModal').classList.remove('active');
+            currentPendingAction = null;
+            currentPendingRecordId = null;
+        }
+
+        function submitPinAuthForm() {
+            const enteredPin = document.getElementById('modalPinInput').value;
+            const staffName = STAFF_DIRECTORY[enteredPin];
+
+            if (!staffName) {
+                alert("⛔ Invalid PIN. Access Denied.");
+                return;
+            }
+
+            const action = currentPendingAction;
+            const targetId = currentPendingRecordId;
+            closePinAuthModal();
+
+            // Run intended operations using verified authorization token
+            if (action === 'SAVE') {
+                executeSaveEntry(staffName);
+            } else if (action === 'EDIT_LOAD') {
+                executeEditLoad(targetId, staffName);
+            } else if (action === 'DELETE') {
+                executeDeleteEntry(targetId, staffName);
+            }
+        }
+
+        function logTrackActivity(staffName, action, details) {
+            const logs = JSON.parse(localStorage.getItem('labAuditTracking') || '[]');
+            const timestamp = new Date().toLocaleString();
+            logs.unshift({
+                name: staffName,
+                action: action,
+                time: timestamp,
+                details: details
+            });
+            localStorage.setItem('labAuditTracking', JSON.stringify(logs));
+            renderAuditLogs();
+        }
+
+        function renderAuditLogs() {
+            const auditBox = document.getElementById('auditLogBox');
+            const logs = JSON.parse(localStorage.getItem('labAuditTracking') || '[]');
+            if(logs.length === 0) {
+                auditBox.innerHTML = `<div class="audit-row" style="color:#94a3b8;">No events logged.</div>`;
+                return;
+            }
+            auditBox.innerHTML = logs.map(l => {
+                let colorClass = 't-save';
+                if(l.action.includes('Delete')) colorClass = 't-del';
+                if(l.action.includes('Edit')) colorClass = 't-edit';
+                return `<div class="audit-row">[${l.time}] <span class="${colorClass}"><b>${l.action}</b></span> by <b>${l.name}</b> - ${l.details}</div>`;
+            }).join('');
+        }
+
+        function getRecentTimestamp() {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            return now.toISOString().slice(0, 16);
+        }
+
+        function setDefaultTimestamps() {
+            const recent = getRecentTimestamp();
+            document.getElementById('entryDateTime').value = recent;
+            document.getElementById('slideTime').value = recent;
+            document.getElementById('bloodTime').value = recent;
+            document.getElementById('marrowTime').value = recent;
+            document.getElementById('aspTime').value = recent;
+            document.getElementById('biopsyTime').value = recent;
+            document.getElementById('opTime').value = recent;
+            document.getElementById('ihcTime').value = recent;
+            document.getElementById('givenToTime').value = recent;
+        }
+
+        function toggleConditional(selectId, targetBoxId) {
+            const val = document.getElementById(selectId).value;
+            document.getElementById(targetBoxId).style.display = (val === "Yes") ? "block" : "none";
+        }
+
+        function toggleTestBox(chkId, targetBoxId) {
+            const isChecked = document.getElementById(chkId).checked;
+            document.getElementById(targetBoxId).style.display = isChecked ? "block" : "none";
+        }
+
+        function calculateTAT(startStr, endStr) {
+            if (!startStr || !endStr) return "N/A";
+            const start = new Date(startStr);
+            const end = new Date(endStr);
+            const diffMs = end - start;
+            if (diffMs < 0) return "Error";
+            
+            const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+            const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+            return `${diffHrs}h ${diffMins}m`;
+        }
+
+        function executeSaveEntry(authorizedStaffName) {
+            const entries = JSON.parse(localStorage.getItem('labDatabase') || '[]');
+            const editId = document.getElementById('editId').value;
+            const targetLabNo = document.getElementById('labNo').value || "Unspecified Lab No";
+            
+            const dataObj = {
+                id: editId ? parseInt(editId) : Date.now(),
+                labNo: targetLabNo,
+                entryDateTime: document.getElementById('entryDateTime').value,
+                patientName: document.getElementById('patientName').value || "Unnamed Patient",
+                age: document.getElementById('age').value || "-",
+                sex: document.getElementById('sex').value || "-",
+                slideRec: document.getElementById('slideRec').value,
+                slideTime: document.getElementById('slideRec').value === "Yes" ? document.getElementById('slideTime').value : "",
+                bloodRec: document.getElementById('bloodRec').value,
+                bloodTime: document.getElementById('bloodRec').value === "Yes" ? document.getElementById('bloodTime').value : "",
+                marrowRec: document.getElementById('marrowRec').value,
+                marrowTime: document.getElementById('marrowRec').value === "Yes" ? document.getElementById('marrowTime').value : "",
+                testAsp: document.getElementById('testAsp').checked,
+                aspNum: document.getElementById('testAsp').checked ? document.getElementById('aspNum').value : "",
+                aspTime: document.getElementById('testAsp').checked ? document.getElementById('aspTime').value : "",
+                testBiopsy: document.getElementById('testBiopsy').checked,
+                biopsyNum: document.getElementById('testBiopsy').checked ? document.getElementById('biopsyNum').value : "",
+                biopsyTime: document.getElementById('testBiopsy').checked ? document.getElementById('biopsyTime').value : "",
+                testOp: document.getElementById('testOp').checked,
+                opNum: document.getElementById('testOp').checked ? document.getElementById('opNum').value : "",
+                opTime: document.getElementById('testOp').checked ? document.getElementById('opTime').value : "",
+                testIhc: document.getElementById('testIhc').checked,
+                ihcNum: document.getElementById('testIhc').checked ? document.getElementById('ihcNum').value : "",
+                ihcTime: document.getElementById('testIhc').checked ? document.getElementById('ihcTime').value : "",
+                givenTo: document.getElementById('givenTo').value,
+                givenToTime: document.getElementById('givenTo').value ? document.getElementById('givenToTime').value : "",
+                otherNote: document.getElementById('otherNote').value,
+                doneBy: authorizedStaffName
+            };
+
+            if (editId) {
+                const idx = entries.findIndex(e => e.id === parseInt(editId));
+                if(idx !== -1) entries[idx] = dataObj;
+                logTrackActivity(authorizedStaffName, "Edit Saved", `Lab No: ${targetLabNo}, Pat: ${dataObj.patientName}`);
+            } else {
+                entries.push(dataObj);
+                logTrackActivity(authorizedStaffName, "Save New", `Lab No: ${targetLabNo}, Pat: ${dataObj.patientName}`);
+            }
+
+            localStorage.setItem('labDatabase', JSON.stringify(entries));
+            resetForm();
+            renderLogs();
+        }
+
+        function renderLogs() {
+            const listContainer = document.getElementById('logList');
+            const query = document.getElementById('searchBar').value.toLowerCase();
+            const entries = JSON.parse(localStorage.getItem('labDatabase') || '[]');
+            
+            entries.sort((a, b) => b.id - a.id);
+            listContainer.innerHTML = "";
+
+            const filtered = entries.filter(e => 
+                e.labNo.toLowerCase().includes(query) || 
+                e.patientName.toLowerCase().includes(query) || 
+                e.givenTo.toLowerCase().includes(query) ||
+                (e.doneBy && e.doneBy.toLowerCase().includes(query))
+            );
+
+            if(filtered.length === 0) {
+                listContainer.innerHTML = `<div style="text-align:center; padding:15px; font-size:0.9rem; color:#94a3b8;">No matching records found.</div>`;
+                return;
+            }
+
+            filtered.forEach(e => {
+                const tat = calculateTAT(e.entryDateTime, e.givenToTime);
+                const div = document.createElement('div');
+                div.className = 'log-item';
+                
+                div.innerHTML = `
+                    <div class="log-header">
+                        <p class="log-title">${escapeHtml(e.labNo)}: ${escapeHtml(e.patientName)}</p>
+                        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
+                            <span class="badge tat-badge">TAT: ${tat}</span>
+                            <span class="badge auth-badge">👤 By: ${escapeHtml(e.doneBy || 'System')}</span>
+                        </div>
+                    </div>
+                    <div class="log-details">
+                        <div><b>Patient:</b> ${escapeHtml(e.age)} Yrs / ${e.sex}</div>
+                        <div><b>Logged Time:</b> ${e.entryDateTime ? e.entryDateTime.replace('T', ' ') : '-'}</div>
+                        <div><b>Slide:</b> ${e.slideRec} ${e.slideTime ? `(${e.slideTime.replace('T',' ')})` : ''}</div>
+                        <div><b>Blood:</b> ${e.bloodRec} ${e.bloodTime ? `(${e.bloodTime.replace('T',' ')})` : ''}</div>
+                        <div><b>Marrow:</b> ${e.marrowRec} ${e.marrowTime ? `(${e.marrowTime.replace('T',' ')})` : ''}</div>
+                        <div><b>Given To:</b> ${escapeHtml(e.givenTo || 'N/A')} ${e.givenToTime ? `(${e.givenToTime.replace('T',' ')})` : ''}</div>
+                    </div>
+                    <div class="test-badges">
+                        ${e.testAsp ? `<span class="badge">Asp (${e.aspNum})</span>`:''}
+                        ${e.testBiopsy ? `<span class="badge">Biopsy (${e.biopsyNum})</span>`:''}
+                        ${e.testOp ? `<span class="badge">Opinion (${e.opNum})</span>`:''}
+                        ${e.testIhc ? `<span class="badge">IHC (${e.ihcNum})</span>`:''}
+                    </div>
+                    ${e.otherNote ? `<div style="font-size:0.8rem; margin-top:6px; color:#64748b; word-break:break-word;"><b>Note:</b> ${escapeHtml(e.otherNote)}</div>` : ''}
+                    <div class="item-actions">
+                        <button class="btn btn-primary sm-btn" onclick="openPinAuthModal('EDIT_LOAD', ${e.id})">Edit</button>
+                        <button class="btn btn-danger sm-btn" onclick="openPinAuthModal('DELETE', ${e.id})">Delete</button>
+                    </div>
+                `;
+                listContainer.appendChild(div);
+            });
+        }
+
+        function executeEditLoad(id, authorizedStaffName) {
+            const entries = JSON.parse(localStorage.getItem('labDatabase') || '[]');
+            const e = entries.find(item => item.id === id);
+            if(!e) return;
+
+            document.getElementById('editId').value = e.id;
+            document.getElementById('labNo').value = e.labNo;
+            document.getElementById('entryDateTime').value = e.entryDateTime;
+            document.getElementById('patientName').value = e.patientName;
+            document.getElementById('age').value = e.age;
+            document.getElementById('sex').value = e.sex;
+
+            document.getElementById('slideRec').value = e.slideRec;
+            document.getElementById('slideTime').value = e.slideTime || getRecentTimestamp();
+            toggleConditional('slideRec', 'slideTimeBox');
+
+            document.getElementById('bloodRec').value = e.bloodRec;
+            document.getElementById('bloodTime').value = e.bloodTime || getRecentTimestamp();
+            toggleConditional('bloodRec', 'bloodTimeBox');
+
+            document.getElementById('marrowRec').value = e.marrowRec;
+            document.getElementById('marrowTime').value = e.marrowTime || getRecentTimestamp();
+            toggleConditional('marrowRec', 'marrowTimeBox');
+
+            document.getElementById('testAsp').checked = e.testAsp;
+            document.getElementById('aspNum').value = e.aspNum;
+            document.getElementById('aspTime').value = e.aspTime || getRecentTimestamp();
+            toggleTestBox('testAsp', 'aspBox');
+
+            document.getElementById('testBiopsy').checked = e.testBiopsy;
+            document.getElementById('biopsyNum').value = e.biopsyNum;
+            document.getElementById('biopsyTime').value = e.biopsyTime || getRecentTimestamp();
+            toggleTestBox('testBiopsy', 'biopsyBox');
+
+            document.getElementById('testOp').checked = e.testOp;
+            document.getElementById('opNum').value = e.opNum;
+            document.getElementById('opTime').value = e.opTime || getRecentTimestamp();
+            toggleTestBox('testOp', 'opBox');
+
+            document.getElementById('testIhc').checked = e.testIhc;
+            document.getElementById('ihcNum').value = e.ihcNum;
+            document.getElementById('ihcTime').value = e.ihcTime || getRecentTimestamp();
+            toggleTestBox('testIhc', 'ihcBox');
+
+            document.getElementById('givenTo').value = e.givenTo;
+            document.getElementById('givenToTime').value = e.givenToTime || getRecentTimestamp();
+            
+            const doc = document.getElementById('givenTo').value;
+            document.getElementById('givenToTimeBox').style.display = (doc !== "") ? "block" : "none";
+
+            document.getElementById('otherNote').value = e.otherNote;
+            document.getElementById('submitBtn').innerText = `Save Changes (${authorizedStaffName})`;
+            
+            logTrackActivity(authorizedStaffName, "Edit Pulled", `Loaded Lab No: ${e.labNo} to fields`);
+            window.scrollTo({top: 0, behavior: 'smooth'});
+        }
+
+        function executeDeleteEntry(id, authorizedStaffName) {
+            const entries = JSON.parse(localStorage.getItem('labDatabase') || '[]');
+            const targetItem = entries.find(e => e.id === id);
+            const targetLabNo = targetItem ? targetItem.labNo : "Unknown";
+
+            if(confirm(`Confirm: Permanent deletion of Lab No ${targetLabNo}?`)) {
+                const cleanEntries = entries.filter(e => e.id !== id);
+                localStorage.setItem('labDatabase', JSON.stringify(cleanEntries));
+                
+                logTrackActivity(authorizedStaffName, "Delete Data", `Deleted Lab Record No: ${targetLabNo}`);
+                renderLogs();
+            }
+        }
+
+        function resetForm() {
+            document.getElementById('labForm').reset();
+            document.getElementById('editId').value = "";
+            document.getElementById('submitBtn').innerText = "Save Entry (Requires PIN)";
+            
+            document.getElementById('slideTimeBox').style.display = "none";
+            document.getElementById('bloodTimeBox').style.display = "none";
+            document.getElementById('marrowTimeBox').style.display = "none";
+            document.getElementById('aspBox').style.display = "none";
+            document.getElementById('biopsyBox').style.display = "none";
+            document.getElementById('opBox').style.display = "none";
+            document.getElementById('ihcBox').style.display = "none";
+            document.getElementById('givenToTimeBox').style.display = "none";
+            
+            setDefaultTimestamps();
+        }
+
+        function printDatabaseLogs() {
+            const entries = JSON.parse(localStorage.getItem('labDatabase') || '[]');
+            if(entries.length === 0) { alert("No rows available in database to print."); return; }
+            
+            entries.sort((a,b) => b.id - a.id);
+            const printTimestamp = new Date().toLocaleString();
+            
+            let printRowsHtml = "";
+            entries.forEach(e => {
+                const testsArr = [];
+                if(e.testAsp) testsArr.push(`Asp (${e.aspNum || '1'})`);
+                if(e.testBiopsy) testsArr.push(`Biopsy (${e.biopsyNum || '1'})`);
+                if(e.testOp) testsArr.push(`Op (${e.opNum || '1'})`);
+                if(e.testIhc) testsArr.push(`IHC (${e.ihcNum || '1'})`);
+
+                printRowsHtml += `
+                    <tr style="page-break-inside: avoid;">
+                        <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">${escapeHtml(e.labNo)}</td>
+                        <td style="border: 1px solid #000; padding: 6px; white-space: nowrap;">${e.entryDateTime ? e.entryDateTime.replace('T', ' ') : '-'}</td>
+                        <td style="border: 1px solid #000; padding: 6px;"><b>${escapeHtml(e.patientName)}</b><br><small>${escapeHtml(e.age)}Y / ${e.sex}</small></td>
+                        <td style="border: 1px solid #000; padding: 6px; font-size: 10px;">Sl:${e.slideRec}<br>Bl:${e.bloodRec}<br>Mr:${e.marrowRec}</td>
+                        <td style="border: 1px solid #000; padding: 6px; font-weight: 500; color: #1e3a8a;">${testsArr.join(', ') || 'None'}</td>
+                        <td style="border: 1px solid #000; padding: 6px;">${escapeHtml(e.givenTo || 'N/A')}<br><small>TAT: ${calculateTAT(e.entryDateTime, e.givenToTime)}</small></td>
+                        <td style="border: 1px solid #000; padding: 6px; font-size: 11px; font-style: italic; max-width: 180px; word-break: break-word;">${escapeHtml(e.otherNote) || '-'}</td>
+                        <td style="border: 1px solid #000; padding: 6px; font-size: 11px; font-weight: bold; text-align: center;">${escapeHtml(e.doneBy || 'System')}</td>
+                    </tr>
+                `;
+            });
+
+            const printArea = document.getElementById('print-area');
+            printArea.innerHTML = `
+                <div style="padding: 10px; font-family: system-ui, sans-serif;">
+                    <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 15px;">
+                        <h2 style="margin: 0 0 4px 0; font-size: 18px; text-transform: uppercase;">Laboratory Records Log Registry</h2>
+                        <p style="margin: 0; font-size: 11px; color: #334155;">Report Export Timestamp: <b>${printTimestamp}</b></p>
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 11px; color: #000;">
+                        <thead>
+                            <tr style="background: #e2e8f0;">
+                                <th style="border: 1px solid #000; padding: 6px; text-align: left;">Lab No</th>
+                                <th style="border: 1px solid #000; padding: 6px; text-align: left;">Date/Time</th>
+                                <th style="border: 1px solid #000; padding: 6px; text-align: left;">Patient Info</th>
+                                <th style="border: 1px solid #000; padding: 6px; text-align: left;">Samples</th>
+                                <th style="border: 1px solid #000; padding: 6px; text-align: left;">Tests</th>
+                                <th style="border: 1px solid #000; padding: 6px; text-align: left;">Handover/TAT</th>
+                                <th style="border: 1px solid #000; padding: 6px; text-align: left;">Notes Remarks</th>
+                                <th style="border: 1px solid #000; padding: 6px; text-align: center;">Staff</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${printRowsHtml}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            window.print();
+            setTimeout(() => { printArea.innerHTML = ""; }, 1000);
+        }
+
+        function escapeHtml(text) {
+            if(!text) return '';
+            const div = document.createElement('div');
+            div.innerText = text;
+            return div.innerHTML;
+        }
+
+        // Handle enter key form submission inside verification card
+        document.getElementById('modalPinInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') { submitPinAuthForm(); }
+        });
+
+        window.onload = function() {
+            setDefaultTimestamps();
+            renderLogs();
+            renderAuditLogs();
+        };
+    </script>
+</body>
+</html>
