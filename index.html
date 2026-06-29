@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lab Data Log (Audit Tracking)</title>
+    <title>Lab Data Log (Supabase Cloud Sync)</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <style>
         :root {
             --primary: #2563eb;
@@ -199,36 +202,6 @@
         .t-edit { color: #60a5fa; }
         .t-del { color: #f87171; }
 
-        /* GOOGLE SITES COMPATIBLE PIN MODAL OVERLAY */
-        .pin-modal-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(4px);
-            z-index: 9999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 0; pointer-events: none;
-            transition: opacity 0.2s ease;
-        }
-        .pin-modal-overlay.active { opacity: 1; pointer-events: auto; }
-        .pin-modal-card {
-            background: #ffffff;
-            padding: 24px;
-            border-radius: 16px;
-            width: 90%;
-            max-width: 340px;
-            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2);
-            text-align: center;
-        }
-        .pin-modal-card h3 { margin: 0 0 8px 0; font-size: 1.1rem; color: #0f172a; }
-        .pin-modal-card p { margin: 0 0 16px 0; font-size: 0.85rem; color: #64748b; }
-        .pin-input {
-            text-align: center; font-size: 1.5rem; letter-spacing: 6px; 
-            padding: 8px; font-weight: bold; border: 2px solid #cbd5e1; margin-bottom: 16px;
-        }
-
         @media print {
             body * { visibility: hidden; }
             #print-area, #print-area * { visibility: visible; }
@@ -242,34 +215,34 @@
     <div class="wrapper">
         <div class="card">
             <h2>Patient Entry Form</h2>
-            <form id="labForm" onsubmit="event.preventDefault(); openPinAuthModal('SAVE');">
+            <form id="labForm" onsubmit="event.preventDefault(); saveEntry();">
                 <input type="hidden" id="editId">
                 
                 <div class="form-grid">
                     <div class="row-2">
                         <div class="field">
                             <label>Lab No. / HA</label>
-                            <input type="text" id="labNo" placeholder="HA-101">
+                            <input type="text" id="labNo" required placeholder="HA-101">
                         </div>
                         <div class="field">
                             <label>Date & Time</label>
-                            <input type="datetime-local" id="entryDateTime">
+                            <input type="datetime-local" id="entryDateTime" required>
                         </div>
                     </div>
 
                     <div class="field">
                         <label>Patient Name</label>
-                        <input type="text" id="patientName" placeholder="Patient Name">
+                        <input type="text" id="patientName" required placeholder="Patient Name">
                     </div>
 
                     <div class="row-2">
                         <div class="field">
                             <label>Age</label>
-                            <input type="number" id="age" placeholder="Years">
+                            <input type="number" id="age" required placeholder="Years">
                         </div>
                         <div class="field">
                             <label>Sex</label>
-                            <select id="sex">
+                            <select id="sex" required>
                                 <option value="">Select</option>
                                 <option value="Male">Male</option>
                                 <option value="Female">Female</option>
@@ -372,7 +345,7 @@
 
                     <div class="field">
                         <label>Given To</label>
-                        <select id="givenTo">
+                        <select id="givenTo" onchange="toggleGivenToTime()" required>
                             <option value="">Select Doctor</option>
                             <option value="Dr. Banerjee">Dr. Banerjee</option>
                             <option value="Dr. Das">Dr. Das</option>
@@ -397,34 +370,32 @@
         <div class="card">
             <h2>Activity Audit Tracker Log</h2>
             <div id="auditLogBox" class="audit-container">
-                <div class="audit-row" style="color:#94a3b8;">No recent database operational events logged.</div>
+                <div class="audit-row" style="color:#94a3b8;">Loading audit configurations from cloud registry...</div>
             </div>
         </div>
 
         <div class="card" style="padding: 12px;">
             <h2>Records Log Database</h2>
-            <input type="text" id="searchBar" class="search-box" oninput="renderLogs()" placeholder="🔍 Search records dynamically...">
+            <input type="text" id="searchBar" class="search-box" oninput="displayFilteredLogs()" placeholder="🔍 Search records dynamically...">
             <button class="btn btn-success" style="margin-bottom:15px;" onclick="printDatabaseLogs()">🖨️ Print All Records Database</button>
 
             <div id="logList" class="log-list"></div>
         </div>
     </div>
 
-    <div id="securityModal" class="pin-modal-overlay">
-        <div class="pin-modal-card">
-            <h3 id="modalActionTitle">Security Authorization</h3>
-            <p>Enter Security Staff PIN to verify changes:</p>
-            <input type="password" id="modalPinInput" class="pin-input" maxlength="4" placeholder="••••" inputmode="numeric">
-            <div style="display:flex; gap:10px;">
-                <button class="btn btn-danger" style="margin:0; background:#94a3b8;" onclick="closePinAuthModal()">Cancel</button>
-                <button class="btn btn-primary" style="margin:0;" onclick="submitPinAuthForm()">Verify</button>
-            </div>
-        </div>
-    </div>
-
     <div id="print-area"></div>
 
     <script>
+        // --- SUPABASE ENGINE CORE CONFIGURATION ---
+        // Replace these placeholder tokens with your real project keys from your Supabase panel settings.
+        const SUPABASE_URL = "https://your-project-id.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.your-anon-key";
+        
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Global cache state arrays
+        let globalRecordsCache = [];
+
         const STAFF_DIRECTORY = {
             "1234": "Sourav",
             "2345": "Dipankar",
@@ -432,73 +403,57 @@
             "4567": "Pratik"
         };
 
-        let currentPendingAction = null;
-        let currentPendingRecordId = null;
-
-        function openPinAuthModal(actionType, recordId = null) {
-            currentPendingAction = actionType;
-            currentPendingRecordId = recordId;
-            document.getElementById('modalActionTitle').innerText = `Authorize [${actionType}]`;
-            document.getElementById('modalPinInput').value = "";
-            document.getElementById('securityModal').classList.add('active');
-            setTimeout(() => document.getElementById('modalPinInput').focus(), 150);
-        }
-
-        function closePinAuthModal() {
-            document.getElementById('securityModal').classList.remove('active');
-            currentPendingAction = null;
-            currentPendingRecordId = null;
-        }
-
-        function submitPinAuthForm() {
-            const enteredPin = document.getElementById('modalPinInput').value;
-            const staffName = STAFF_DIRECTORY[enteredPin];
-
-            if (!staffName) {
+        function authenticateStaff(actionType) {
+            const inputPin = prompt(`Enter Security PIN to authorize [${actionType}]:`);
+            if (inputPin === null) return null; 
+            
+            if (STAFF_DIRECTORY[inputPin]) {
+                return STAFF_DIRECTORY[inputPin];
+            } else {
                 alert("⛔ Invalid PIN. Access Denied.");
-                return;
-            }
-
-            const action = currentPendingAction;
-            const targetId = currentPendingRecordId;
-            closePinAuthModal();
-
-            // Run intended operations using verified authorization token
-            if (action === 'SAVE') {
-                executeSaveEntry(staffName);
-            } else if (action === 'EDIT_LOAD') {
-                executeEditLoad(targetId, staffName);
-            } else if (action === 'DELETE') {
-                executeDeleteEntry(targetId, staffName);
+                return false;
             }
         }
 
-        function logTrackActivity(staffName, action, details) {
-            const logs = JSON.parse(localStorage.getItem('labAuditTracking') || '[]');
+        async function logTrackActivity(staffName, action, details) {
             const timestamp = new Date().toLocaleString();
-            logs.unshift({
-                name: staffName,
-                action: action,
-                time: timestamp,
-                details: details
-            });
-            localStorage.setItem('labAuditTracking', JSON.stringify(logs));
-            renderAuditLogs();
+            try {
+                await _supabase.from('lab_audit_tracking').insert([{
+                    staff_name: staffName,
+                    action_type: action,
+                    event_timestamp: timestamp,
+                    details_summary: details
+                }]);
+                fetchAndRenderAuditLogs();
+            } catch (err) {
+                console.error("Audit Logging Error: ", err);
+            }
         }
 
-        function renderAuditLogs() {
+        async function fetchAndRenderAuditLogs() {
             const auditBox = document.getElementById('auditLogBox');
-            const logs = JSON.parse(localStorage.getItem('labAuditTracking') || '[]');
-            if(logs.length === 0) {
-                auditBox.innerHTML = `<div class="audit-row" style="color:#94a3b8;">No events logged.</div>`;
-                return;
+            try {
+                let { data: logs, error } = await _supabase
+                    .from('lab_audit_tracking')
+                    .select('*')
+                    .order('id', { ascending: false })
+                    .limit(40);
+
+                if (error) throw error;
+
+                if (!logs || logs.length === 0) {
+                    auditBox.innerHTML = `<div class="audit-row" style="color:#94a3b8;">No events logged.</div>`;
+                    return;
+                }
+                auditBox.innerHTML = logs.map(l => {
+                    let colorClass = 't-save';
+                    if(l.action_type.includes('Delete')) colorClass = 't-del';
+                    if(l.action_type.includes('Edit')) colorClass = 't-edit';
+                    return `<div class="audit-row">[${l.event_timestamp}] <span class="${colorClass}"><b>${l.action_type}</b></span> by <b>${l.staff_name}</b> - ${escapeHtml(l.details_summary)}</div>`;
+                }).join('');
+            } catch (err) {
+                auditBox.innerHTML = `<div class="audit-row" style="color:#f87171;">Failed to pull cloud logs: ${err.message}</div>`;
             }
-            auditBox.innerHTML = logs.map(l => {
-                let colorClass = 't-save';
-                if(l.action.includes('Delete')) colorClass = 't-del';
-                if(l.action.includes('Edit')) colorClass = 't-edit';
-                return `<div class="audit-row">[${l.time}] <span class="${colorClass}"><b>${l.action}</b></span> by <b>${l.name}</b> - ${l.details}</div>`;
-            }).join('');
         }
 
         function getRecentTimestamp() {
@@ -530,6 +485,11 @@
             document.getElementById(targetBoxId).style.display = isChecked ? "block" : "none";
         }
 
+        function toggleGivenToTime() {
+            const doc = document.getElementById('givenTo').value;
+            document.getElementById('givenToTimeBox').style.display = (doc !== "") ? "block" : "none";
+        }
+
         function calculateTAT(startStr, endStr) {
             if (!startStr || !endStr) return "N/A";
             const start = new Date(startStr);
@@ -542,69 +502,88 @@
             return `${diffHrs}h ${diffMins}m`;
         }
 
-        function executeSaveEntry(authorizedStaffName) {
-            const entries = JSON.parse(localStorage.getItem('labDatabase') || '[]');
+        async function saveEntry() {
             const editId = document.getElementById('editId').value;
-            const targetLabNo = document.getElementById('labNo').value || "Unspecified Lab No";
+            const targetLabNo = document.getElementById('labNo').value;
             
+            const actionLabel = editId ? "Edit Change" : "Save New Record";
+            const staffName = authenticateStaff(actionLabel);
+            if (!staffName) return; 
+
             const dataObj = {
                 id: editId ? parseInt(editId) : Date.now(),
-                labNo: targetLabNo,
-                entryDateTime: document.getElementById('entryDateTime').value,
-                patientName: document.getElementById('patientName').value || "Unnamed Patient",
-                age: document.getElementById('age').value || "-",
-                sex: document.getElementById('sex').value || "-",
-                slideRec: document.getElementById('slideRec').value,
-                slideTime: document.getElementById('slideRec').value === "Yes" ? document.getElementById('slideTime').value : "",
-                bloodRec: document.getElementById('bloodRec').value,
-                bloodTime: document.getElementById('bloodRec').value === "Yes" ? document.getElementById('bloodTime').value : "",
-                marrowRec: document.getElementById('marrowRec').value,
-                marrowTime: document.getElementById('marrowRec').value === "Yes" ? document.getElementById('marrowTime').value : "",
-                testAsp: document.getElementById('testAsp').checked,
-                aspNum: document.getElementById('testAsp').checked ? document.getElementById('aspNum').value : "",
-                aspTime: document.getElementById('testAsp').checked ? document.getElementById('aspTime').value : "",
-                testBiopsy: document.getElementById('testBiopsy').checked,
-                biopsyNum: document.getElementById('testBiopsy').checked ? document.getElementById('biopsyNum').value : "",
-                biopsyTime: document.getElementById('testBiopsy').checked ? document.getElementById('biopsyTime').value : "",
-                testOp: document.getElementById('testOp').checked,
-                opNum: document.getElementById('testOp').checked ? document.getElementById('opNum').value : "",
-                opTime: document.getElementById('testOp').checked ? document.getElementById('opTime').value : "",
-                testIhc: document.getElementById('testIhc').checked,
-                ihcNum: document.getElementById('testIhc').checked ? document.getElementById('ihcNum').value : "",
-                ihcTime: document.getElementById('testIhc').checked ? document.getElementById('ihcTime').value : "",
-                givenTo: document.getElementById('givenTo').value,
-                givenToTime: document.getElementById('givenTo').value ? document.getElementById('givenToTime').value : "",
-                otherNote: document.getElementById('otherNote').value,
-                doneBy: authorizedStaffName
+                lab_no: targetLabNo,
+                entry_date_time: document.getElementById('entryDateTime').value,
+                patient_name: document.getElementById('patientName').value,
+                age: parseInt(document.getElementById('age').value) || 0,
+                sex: document.getElementById('sex').value,
+                slide_rec: document.getElementById('slideRec').value,
+                slide_time: document.getElementById('slideRec').value === "Yes" ? document.getElementById('slideTime').value : "",
+                blood_rec: document.getElementById('bloodRec').value,
+                blood_time: document.getElementById('bloodRec').value === "Yes" ? document.getElementById('bloodTime').value : "",
+                marrow_rec: document.getElementById('marrowRec').value,
+                marrow_time: document.getElementById('marrowRec').value === "Yes" ? document.getElementById('marrowTime').value : "",
+                test_asp: document.getElementById('testAsp').checked,
+                asp_num: document.getElementById('testAsp').checked ? document.getElementById('aspNum').value : "",
+                asp_time: document.getElementById('testAsp').checked ? document.getElementById('aspTime').value : "",
+                test_biopsy: document.getElementById('testBiopsy').checked,
+                biopsy_num: document.getElementById('testBiopsy').checked ? document.getElementById('biopsyNum').value : "",
+                biopsy_time: document.getElementById('testBiopsy').checked ? document.getElementById('biopsyTime').value : "",
+                test_op: document.getElementById('testOp').checked,
+                op_num: document.getElementById('testOp').checked ? document.getElementById('opNum').value : "",
+                op_time: document.getElementById('testOp').checked ? document.getElementById('opTime').value : "",
+                test_ihc: document.getElementById('testIhc').checked,
+                ihc_num: document.getElementById('testIhc').checked ? document.getElementById('ihcNum').value : "",
+                ihc_time: document.getElementById('testIhc').checked ? document.getElementById('ihcTime').value : "",
+                given_to: document.getElementById('givenTo').value,
+                given_to_time: document.getElementById('givenTo').value ? document.getElementById('givenToTime').value : "",
+                other_note: document.getElementById('otherNote').value,
+                done_by: staffName
             };
 
-            if (editId) {
-                const idx = entries.findIndex(e => e.id === parseInt(editId));
-                if(idx !== -1) entries[idx] = dataObj;
-                logTrackActivity(authorizedStaffName, "Edit Saved", `Lab No: ${targetLabNo}, Pat: ${dataObj.patientName}`);
-            } else {
-                entries.push(dataObj);
-                logTrackActivity(authorizedStaffName, "Save New", `Lab No: ${targetLabNo}, Pat: ${dataObj.patientName}`);
+            try {
+                if (editId) {
+                    const { error } = await _supabase.from('lab_database').update(dataObj).eq('id', dataObj.id);
+                    if (error) throw error;
+                    await logTrackActivity(staffName, "Edit Saved", `Lab No: ${targetLabNo}, Pat: ${dataObj.patient_name}`);
+                } else {
+                    const { error } = await _supabase.from('lab_database').insert([dataObj]);
+                    if (error) throw error;
+                    await logTrackActivity(staffName, "Save New", `Lab No: ${targetLabNo}, Pat: ${dataObj.patient_name}`);
+                }
+                resetForm();
+                await loadCloudRecords();
+            } catch (err) {
+                alert("Database Submission Failed: " + err.message);
             }
-
-            localStorage.setItem('labDatabase', JSON.stringify(entries));
-            resetForm();
-            renderLogs();
         }
 
-        function renderLogs() {
+        async function loadCloudRecords() {
+            try {
+                let { data: records, error } = await _supabase
+                    .from('lab_database')
+                    .select('*')
+                    .order('id', { ascending: false });
+
+                if (error) throw error;
+                globalRecordsCache = records || [];
+                displayFilteredLogs();
+            } catch (err) {
+                document.getElementById('logList').innerHTML = `<div style="color:red; padding:10px;">Cloud connection error: ${err.message}</div>`;
+            }
+        }
+
+        function displayFilteredLogs() {
             const listContainer = document.getElementById('logList');
             const query = document.getElementById('searchBar').value.toLowerCase();
-            const entries = JSON.parse(localStorage.getItem('labDatabase') || '[]');
             
-            entries.sort((a, b) => b.id - a.id);
             listContainer.innerHTML = "";
 
-            const filtered = entries.filter(e => 
-                e.labNo.toLowerCase().includes(query) || 
-                e.patientName.toLowerCase().includes(query) || 
-                e.givenTo.toLowerCase().includes(query) ||
-                (e.doneBy && e.doneBy.toLowerCase().includes(query))
+            const filtered = globalRecordsCache.filter(e => 
+                (e.lab_no && e.lab_no.toLowerCase().includes(query)) || 
+                (e.patient_name && e.patient_name.toLowerCase().includes(query)) || 
+                (e.given_to && e.given_to.toLowerCase().includes(query)) ||
+                (e.done_by && e.done_by.toLowerCase().includes(query))
             );
 
             if(filtered.length === 0) {
@@ -613,110 +592,116 @@
             }
 
             filtered.forEach(e => {
-                const tat = calculateTAT(e.entryDateTime, e.givenToTime);
+                const tat = calculateTAT(e.entry_date_time, e.given_to_time);
                 const div = document.createElement('div');
                 div.className = 'log-item';
                 
                 div.innerHTML = `
                     <div class="log-header">
-                        <p class="log-title">${escapeHtml(e.labNo)}: ${escapeHtml(e.patientName)}</p>
+                        <p class="log-title">${escapeHtml(e.lab_no)}: ${escapeHtml(e.patient_name)}</p>
                         <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
                             <span class="badge tat-badge">TAT: ${tat}</span>
-                            <span class="badge auth-badge">👤 By: ${escapeHtml(e.doneBy || 'System')}</span>
+                            <span class="badge auth-badge">👤 By: ${escapeHtml(e.done_by || 'System')}</span>
                         </div>
                     </div>
                     <div class="log-details">
-                        <div><b>Patient:</b> ${escapeHtml(e.age)} Yrs / ${e.sex}</div>
-                        <div><b>Logged Time:</b> ${e.entryDateTime ? e.entryDateTime.replace('T', ' ') : '-'}</div>
-                        <div><b>Slide:</b> ${e.slideRec} ${e.slideTime ? `(${e.slideTime.replace('T',' ')})` : ''}</div>
-                        <div><b>Blood:</b> ${e.bloodRec} ${e.bloodTime ? `(${e.bloodTime.replace('T',' ')})` : ''}</div>
-                        <div><b>Marrow:</b> ${e.marrowRec} ${e.marrowTime ? `(${e.marrowTime.replace('T',' ')})` : ''}</div>
-                        <div><b>Given To:</b> ${escapeHtml(e.givenTo || 'N/A')} ${e.givenToTime ? `(${e.givenToTime.replace('T',' ')})` : ''}</div>
+                        <div><b>Patient:</b> ${escapeHtml(String(e.age))} Yrs / ${e.sex}</div>
+                        <div><b>Logged Time:</b> ${e.entry_date_time ? e.entry_date_time.replace('T', ' ') : ''}</div>
+                        <div><b>Slide:</b> ${e.slide_rec} ${e.slide_time ? `(${e.slide_time.replace('T',' ')})` : ''}</div>
+                        <div><b>Blood:</b> ${e.blood_rec} ${e.blood_time ? `(${e.blood_time.replace('T',' ')})` : ''}</div>
+                        <div><b>Marrow:</b> ${e.marrow_rec} ${e.marrow_time ? `(${e.marrow_time.replace('T',' ')})` : ''}</div>
+                        <div><b>Given To:</b> ${escapeHtml(e.given_to || 'N/A')} ${e.given_to_time ? `(${e.given_to_time.replace('T',' ')})` : ''}</div>
                     </div>
                     <div class="test-badges">
-                        ${e.testAsp ? `<span class="badge">Asp (${e.aspNum})</span>`:''}
-                        ${e.testBiopsy ? `<span class="badge">Biopsy (${e.biopsyNum})</span>`:''}
-                        ${e.testOp ? `<span class="badge">Opinion (${e.opNum})</span>`:''}
-                        ${e.testIhc ? `<span class="badge">IHC (${e.ihcNum})</span>`:''}
+                        ${e.test_asp ? `<span class="badge">Asp (${e.asp_num})</span>`:''}
+                        ${e.test_biopsy ? `<span class="badge">Biopsy (${e.biopsy_num})</span>`:''}
+                        ${e.test_op ? `<span class="badge">Opinion (${e.op_num})</span>`:''}
+                        ${e.test_ihc ? `<span class="badge">IHC (${e.ihc_num})</span>`:''}
                     </div>
-                    ${e.otherNote ? `<div style="font-size:0.8rem; margin-top:6px; color:#64748b; word-break:break-word;"><b>Note:</b> ${escapeHtml(e.otherNote)}</div>` : ''}
+                    ${e.other_note ? `<div style="font-size:0.8rem; margin-top:6px; color:#64748b; word-break:break-word;"><b>Note:</b> ${escapeHtml(e.other_note)}</div>` : ''}
                     <div class="item-actions">
-                        <button class="btn btn-primary sm-btn" onclick="openPinAuthModal('EDIT_LOAD', ${e.id})">Edit</button>
-                        <button class="btn btn-danger sm-btn" onclick="openPinAuthModal('DELETE', ${e.id})">Delete</button>
+                        <button class="btn btn-primary sm-btn" onclick="editEntry(${e.id})">Edit</button>
+                        <button class="btn btn-danger sm-btn" onclick="deleteEntry(${e.id})">Delete</button>
                     </div>
                 `;
                 listContainer.appendChild(div);
             });
         }
 
-        function executeEditLoad(id, authorizedStaffName) {
-            const entries = JSON.parse(localStorage.getItem('labDatabase') || '[]');
-            const e = entries.find(item => item.id === id);
+        function editEntry(id) {
+            const staffName = authenticateStaff("Edit Access");
+            if (!staffName) return; 
+
+            const e = globalRecordsCache.find(item => item.id === id);
             if(!e) return;
 
             document.getElementById('editId').value = e.id;
-            document.getElementById('labNo').value = e.labNo;
-            document.getElementById('entryDateTime').value = e.entryDateTime;
-            document.getElementById('patientName').value = e.patientName;
+            document.getElementById('labNo').value = e.lab_no;
+            document.getElementById('entryDateTime').value = e.entry_date_time;
+            document.getElementById('patientName').value = e.patient_name;
             document.getElementById('age').value = e.age;
             document.getElementById('sex').value = e.sex;
 
-            document.getElementById('slideRec').value = e.slideRec;
-            document.getElementById('slideTime').value = e.slideTime || getRecentTimestamp();
+            document.getElementById('slideRec').value = e.slide_rec;
+            document.getElementById('slideTime').value = e.slide_time || getRecentTimestamp();
             toggleConditional('slideRec', 'slideTimeBox');
 
-            document.getElementById('bloodRec').value = e.bloodRec;
-            document.getElementById('bloodTime').value = e.bloodTime || getRecentTimestamp();
+            document.getElementById('bloodRec').value = e.blood_rec;
+            document.getElementById('bloodTime').value = e.blood_time || getRecentTimestamp();
             toggleConditional('bloodRec', 'bloodTimeBox');
 
-            document.getElementById('marrowRec').value = e.marrowRec;
-            document.getElementById('marrowTime').value = e.marrowTime || getRecentTimestamp();
+            document.getElementById('marrowRec').value = e.marrow_rec;
+            document.getElementById('marrowTime').value = e.marrow_time || getRecentTimestamp();
             toggleConditional('marrowRec', 'marrowTimeBox');
 
-            document.getElementById('testAsp').checked = e.testAsp;
-            document.getElementById('aspNum').value = e.aspNum;
-            document.getElementById('aspTime').value = e.aspTime || getRecentTimestamp();
+            document.getElementById('testAsp').checked = e.test_asp;
+            document.getElementById('aspNum').value = e.asp_num;
+            document.getElementById('aspTime').value = e.asp_time || getRecentTimestamp();
             toggleTestBox('testAsp', 'aspBox');
 
-            document.getElementById('testBiopsy').checked = e.testBiopsy;
-            document.getElementById('biopsyNum').value = e.biopsyNum;
-            document.getElementById('biopsyTime').value = e.biopsyTime || getRecentTimestamp();
+            document.getElementById('testBiopsy').checked = e.test_biopsy;
+            document.getElementById('biopsyNum').value = e.biopsy_num;
+            document.getElementById('biopsyTime').value = e.biopsy_time || getRecentTimestamp();
             toggleTestBox('testBiopsy', 'biopsyBox');
 
-            document.getElementById('testOp').checked = e.testOp;
-            document.getElementById('opNum').value = e.opNum;
-            document.getElementById('opTime').value = e.opTime || getRecentTimestamp();
+            document.getElementById('testOp').checked = e.test_op;
+            document.getElementById('opNum').value = e.op_num;
+            document.getElementById('opTime').value = e.op_time || getRecentTimestamp();
             toggleTestBox('testOp', 'opBox');
 
-            document.getElementById('testIhc').checked = e.testIhc;
-            document.getElementById('ihcNum').value = e.ihcNum;
-            document.getElementById('ihcTime').value = e.ihcTime || getRecentTimestamp();
+            document.getElementById('testIhc').checked = e.test_ihc;
+            document.getElementById('ihcNum').value = e.ihc_num;
+            document.getElementById('ihcTime').value = e.ihc_time || getRecentTimestamp();
             toggleTestBox('testIhc', 'ihcBox');
 
-            document.getElementById('givenTo').value = e.givenTo;
-            document.getElementById('givenToTime').value = e.givenToTime || getRecentTimestamp();
-            
-            const doc = document.getElementById('givenTo').value;
-            document.getElementById('givenToTimeBox').style.display = (doc !== "") ? "block" : "none";
+            document.getElementById('givenTo').value = e.given_to;
+            document.getElementById('givenToTime').value = e.given_to_time || getRecentTimestamp();
+            toggleGivenToTime();
 
-            document.getElementById('otherNote').value = e.otherNote;
-            document.getElementById('submitBtn').innerText = `Save Changes (${authorizedStaffName})`;
+            document.getElementById('otherNote').value = e.other_note;
+            document.getElementById('submitBtn').innerText = `Save Changes (${staffName})`;
             
-            logTrackActivity(authorizedStaffName, "Edit Pulled", `Loaded Lab No: ${e.labNo} to fields`);
+            logTrackActivity(staffName, "Edit Pulled", `Loaded Lab No: ${e.lab_no} to fields`);
             window.scrollTo({top: 0, behavior: 'smooth'});
         }
 
-        function executeDeleteEntry(id, authorizedStaffName) {
-            const entries = JSON.parse(localStorage.getItem('labDatabase') || '[]');
-            const targetItem = entries.find(e => e.id === id);
-            const targetLabNo = targetItem ? targetItem.labNo : "Unknown";
+        async function deleteEntry(id) {
+            const staffName = authenticateStaff("Delete Record");
+            if (!staffName) return; 
+
+            const targetItem = globalRecordsCache.find(e => e.id === id);
+            const targetLabNo = targetItem ? targetItem.lab_no : "Unknown";
 
             if(confirm(`Confirm: Permanent deletion of Lab No ${targetLabNo}?`)) {
-                const cleanEntries = entries.filter(e => e.id !== id);
-                localStorage.setItem('labDatabase', JSON.stringify(cleanEntries));
-                
-                logTrackActivity(authorizedStaffName, "Delete Data", `Deleted Lab Record No: ${targetLabNo}`);
-                renderLogs();
+                try {
+                    const { error } = await _supabase.from('lab_database').delete().eq('id', id);
+                    if (error) throw error;
+                    
+                    await logTrackActivity(staffName, "Delete Data", `Deleted Lab Record No: ${targetLabNo}`);
+                    await loadCloudRecords();
+                } catch (err) {
+                    alert("Deletion failed: " + err.message);
+                }
             }
         }
 
@@ -738,30 +723,28 @@
         }
 
         function printDatabaseLogs() {
-            const entries = JSON.parse(localStorage.getItem('labDatabase') || '[]');
-            if(entries.length === 0) { alert("No rows available in database to print."); return; }
+            if(globalRecordsCache.length === 0) { alert("No rows available in database to print."); return; }
             
-            entries.sort((a,b) => b.id - a.id);
             const printTimestamp = new Date().toLocaleString();
-            
             let printRowsHtml = "";
-            entries.forEach(e => {
+            
+            globalRecordsCache.forEach(e => {
                 const testsArr = [];
-                if(e.testAsp) testsArr.push(`Asp (${e.aspNum || '1'})`);
-                if(e.testBiopsy) testsArr.push(`Biopsy (${e.biopsyNum || '1'})`);
-                if(e.testOp) testsArr.push(`Op (${e.opNum || '1'})`);
-                if(e.testIhc) testsArr.push(`IHC (${e.ihcNum || '1'})`);
+                if(e.test_asp) testsArr.push(`Asp (${e.asp_num || '1'})`);
+                if(e.test_biopsy) testsArr.push(`Biopsy (${e.biopsy_num || '1'})`);
+                if(e.test_op) testsArr.push(`Op (${e.op_num || '1'})`);
+                if(e.test_ihc) testsArr.push(`IHC (${e.ihc_num || '1'})`);
 
                 printRowsHtml += `
                     <tr style="page-break-inside: avoid;">
-                        <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">${escapeHtml(e.labNo)}</td>
-                        <td style="border: 1px solid #000; padding: 6px; white-space: nowrap;">${e.entryDateTime ? e.entryDateTime.replace('T', ' ') : '-'}</td>
-                        <td style="border: 1px solid #000; padding: 6px;"><b>${escapeHtml(e.patientName)}</b><br><small>${escapeHtml(e.age)}Y / ${e.sex}</small></td>
-                        <td style="border: 1px solid #000; padding: 6px; font-size: 10px;">Sl:${e.slideRec}<br>Bl:${e.bloodRec}<br>Mr:${e.marrowRec}</td>
+                        <td style="border: 1px solid #000; padding: 6px; font-weight: bold;">${escapeHtml(e.lab_no)}</td>
+                        <td style="border: 1px solid #000; padding: 6px; white-space: nowrap;">${e.entry_date_time ? e.entry_date_time.replace('T', ' ') : ''}</td>
+                        <td style="border: 1px solid #000; padding: 6px;"><b>${escapeHtml(e.patient_name)}</b><br><small>${escapeHtml(String(e.age))}Y / ${e.sex}</small></td>
+                        <td style="border: 1px solid #000; padding: 6px; font-size: 10px;">Sl:${e.slide_rec}<br>Bl:${e.blood_rec}<br>Mr:${e.marrow_rec}</td>
                         <td style="border: 1px solid #000; padding: 6px; font-weight: 500; color: #1e3a8a;">${testsArr.join(', ') || 'None'}</td>
-                        <td style="border: 1px solid #000; padding: 6px;">${escapeHtml(e.givenTo || 'N/A')}<br><small>TAT: ${calculateTAT(e.entryDateTime, e.givenToTime)}</small></td>
-                        <td style="border: 1px solid #000; padding: 6px; font-size: 11px; font-style: italic; max-width: 180px; word-break: break-word;">${escapeHtml(e.otherNote) || '-'}</td>
-                        <td style="border: 1px solid #000; padding: 6px; font-size: 11px; font-weight: bold; text-align: center;">${escapeHtml(e.doneBy || 'System')}</td>
+                        <td style="border: 1px solid #000; padding: 6px;">${escapeHtml(e.given_to || 'N/A')}<br><small>TAT: ${calculateTAT(e.entry_date_time, e.given_to_time)}</small></td>
+                        <td style="border: 1px solid #000; padding: 6px; font-size: 11px; font-style: italic; max-width: 180px; word-break: break-word;">${escapeHtml(e.other_note) || '-'}</td>
+                        <td style="border: 1px solid #000; padding: 6px; font-size: 11px; font-weight: bold; text-align: center;">${escapeHtml(e.done_by || 'System')}</td>
                     </tr>
                 `;
             });
@@ -804,15 +787,10 @@
             return div.innerHTML;
         }
 
-        // Handle enter key form submission inside verification card
-        document.getElementById('modalPinInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') { submitPinAuthForm(); }
-        });
-
         window.onload = function() {
             setDefaultTimestamps();
-            renderLogs();
-            renderAuditLogs();
+            loadCloudRecords();
+            fetchAndRenderAuditLogs();
         };
     </script>
 </body>
